@@ -47,10 +47,36 @@ void print_table(const char *title, PCB p[]) {
 
 void print_gantt(const char *algo_name, Event ev[], int cnt) {
     printf("\n>>> Gantt Chart – %s\n", algo_name);
-    for(int i=0; i<cnt; i++) printf("|  P%-2d  ", ev[i].pid);
+    
+    // 연속된 동일한 PID 이벤트 합치기
+    Event merged[MAX_EVENTS];
+    int merged_cnt = 0;
+    
+    if (cnt > 0) {
+        merged[0] = ev[0];
+        for (int i = 1; i < cnt; i++) {
+            if (ev[i].pid == merged[merged_cnt].pid && 
+                ev[i].start == merged[merged_cnt].end) {
+                // 연속된 동일한 PID 이벤트면 end 시간만 업데이트
+                merged[merged_cnt].end = ev[i].end;
+            } else {
+                // 다른 PID나 IDLE이면 새로운 이벤트 추가
+                merged[++merged_cnt] = ev[i];
+            }
+        }
+        merged_cnt++;
+    }
+
+    // 합쳐진 이벤트 출력
+    for(int i=0; i<merged_cnt; i++) {
+        if (merged[i].pid == -1)
+            printf("|  IDLE ");
+        else
+            printf("|  P%-2d  ", merged[i].pid);
+    }
     printf("|\n");
-    printf("%-7d", ev[0].start);
-    for(int i=0; i<cnt; i++) printf("%-7d", ev[i].end);
+    printf("%-7d", merged[0].start);
+    for(int i=0; i<merged_cnt; i++) printf("%-7d", merged[i].end);
     printf("\n");
 }
 
@@ -78,7 +104,11 @@ void fcfs() {
             if(!P[i].finished && P[i].arrival <= time && P[i].arrival < min_arr) {
                 idx = i; min_arr = P[i].arrival;
             }
-        if(idx == -1) { time++; continue; }
+        if(idx == -1) { 
+            ev[ec++] = (Event){-1, time, time + 1};
+            time++; 
+            continue; 
+        }
 
         if(P[idx].start_time == -1) P[idx].start_time = time;
         int start = time;
@@ -106,7 +136,11 @@ void sjf_np() {
             if(!P[i].finished && P[i].arrival <= time && P[i].burst < min_burst) {
                 idx = i; min_burst = P[i].burst;
             }
-        if(idx == -1) { time++; continue; }
+        if(idx == -1) { 
+            ev[ec++] = (Event){-1, time, time + 1};
+            time++; 
+            continue; 
+        }
 
         if(P[idx].start_time == -1) P[idx].start_time = time;
         int start = time;
@@ -157,7 +191,12 @@ void sjf_p() {
                 P[idx].finished = 1; completed++;
                 last = -1;
             }
-        } else { time++; last = -1; }
+        } else { 
+            ev[ec++] = (Event){-1, time, time + 1};
+            last = -1;
+            time++; 
+            continue; 
+        }
     }
     print_table("[SJF – P]", P);
     print_gantt("SJF – P", ev, ec);
@@ -174,7 +213,11 @@ void priority_np() {
             if(!P[i].finished && P[i].arrival <= time && P[i].priority < min_pri) {
                 idx = i; min_pri = P[i].priority;
             }
-        if(idx == -1) { time++; continue; }
+        if(idx == -1) { 
+            ev[ec++] = (Event){-1, time, time + 1};
+            time++; 
+            continue; 
+        }
 
         if(P[idx].start_time == -1) P[idx].start_time = time;
         int start = time;
@@ -225,7 +268,12 @@ void priority_p() {
                 P[idx].finished = 1; completed++;
                 last = -1;
             }
-        } else { time++; last = -1; }
+        } else { 
+            ev[ec++] = (Event){-1, time, time + 1};
+            last = -1;
+            time++; 
+            continue; 
+        }
     }
     print_table("[Priority – P]", P);
     print_gantt("Priority – P", ev, ec);
@@ -241,6 +289,7 @@ void rr() {
 
     while(completed < N) {
         if(front == rear) {
+            ev[ec++] = (Event){-1, time, time + 1};
             time++;
             for(int i=0; i<N; i++) 
                 if(!P[i].finished && P[i].arrival == time) q[rear++] = i;
@@ -352,12 +401,6 @@ void lottery() {
 
             last = idx;
 
-            // 실행 중 도착한 새로운 프로세스들 처리
-            for(int t=start+1; t<=end; t++)
-                for(int i=0; i<N; i++) 
-                    if(!P[i].finished && P[i].arrival == t) 
-                        available[avail_count++] = i;
-
             if(P[idx].remaining == 0) {
                 P[idx].completion = time;
                 P[idx].turnaround = time - P[idx].arrival;
@@ -367,8 +410,10 @@ void lottery() {
             }
         } else { 
             printf("%d\tNone\t\t\tNone\t\t-\n", time);
+            ev[ec++] = (Event){-1, time, time + 1};
             time++; 
             last = -1; 
+            continue; 
         }
     }
     printf("\n");
