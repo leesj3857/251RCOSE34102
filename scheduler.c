@@ -11,6 +11,8 @@ typedef struct {
     int pid, arrival, burst, remaining, priority;
     int start_time, completion, waiting, turnaround;
     int finished;
+    double vruntime;  // 가상 실행 시간
+    int weight;       // 프로세스 가중치
 } PCB;
 
 typedef struct {
@@ -28,6 +30,8 @@ void reset_metrics(PCB p[]) {
         p[i].start_time = -1;
         p[i].completion = p[i].waiting = p[i].turnaround = 0;
         p[i].finished = 0;
+        p[i].vruntime = 0.0;
+        p[i].weight = (10 - p[i].priority) * 100;  // 우선순위가 높을수록 가중치 증가
     }
 }
 
@@ -421,6 +425,81 @@ void lottery() {
     print_gantt("Lottery", ev, ec);
 }
 
+void cfs() {
+    PCB P[MAX_PROCESSES]; clone(P, proc_orig); reset_metrics(P);
+    Event ev[MAX_EVENTS]; int ec=0;
+    int time=0, completed=0;
+    int last = -1;
+    const double MIN_GRANULARITY = 0.75;  // 최소 실행 시간 단위
+    const double TARGET_LATENCY = 6.0;    // 목표 지연 시간
+
+    printf("\n[CFS Weight Distribution]\n");
+    printf("PID\tPriority\tWeight\n");
+    for(int i=0; i<N; i++) {
+        printf("%d\t%d\t\t%d\n", P[i].pid, P[i].priority, P[i].weight);
+    }
+    printf("\n");
+
+    while(completed < N) {
+        int idx = -1;
+        double min_vruntime = 1e9;
+        int total_weight = 0;
+        int available_count = 0;
+
+        // 현재 실행 가능한 프로세스들의 가중치 합계와 최소 vruntime 계산
+        for(int i=0; i<N; i++) {
+            if(!P[i].finished && P[i].arrival <= time) {
+                total_weight += P[i].weight;
+                available_count++;
+                if(P[i].vruntime < min_vruntime) {
+                    min_vruntime = P[i].vruntime;
+                    idx = i;
+                }
+            }
+        }
+
+        if(available_count > 0) {
+            if(P[idx].start_time == -1) P[idx].start_time = time;
+
+            // 실행 시간 계산 (가중치 기반)
+            double time_slice = TARGET_LATENCY * (P[idx].weight / (double)total_weight);
+            if(time_slice < MIN_GRANULARITY) time_slice = MIN_GRANULARITY;
+            
+            int exec_time = (int)(time_slice > P[idx].remaining ? P[idx].remaining : time_slice);
+            
+            int start = time;
+            P[idx].remaining -= exec_time;
+            time += exec_time;
+            int end = time;
+
+            // vruntime 업데이트 (가중치 반영)
+            P[idx].vruntime += exec_time * (1024.0 / P[idx].weight);
+
+            if(idx != last)
+                ev[ec++] = (Event){P[idx].pid, start, end};
+            else
+                ev[ec-1].end = end;
+
+            last = idx;
+
+            if(P[idx].remaining == 0) {
+                P[idx].completion = time;
+                P[idx].turnaround = time - P[idx].arrival;
+                P[idx].waiting = P[idx].turnaround - P[idx].burst;
+                P[idx].finished = 1; completed++;
+                last = -1;
+            }
+        } else {
+            ev[ec++] = (Event){-1, time, time + 1};
+            time++;
+            last = -1;
+            continue;
+        }
+    }
+    print_table("[CFS]", P);
+    print_gantt("CFS", ev, ec);
+}
+
 int main() {
     printf("================  CPU Scheduling Simulator  ================\n");
     create_processes_random();
@@ -433,6 +512,7 @@ int main() {
     priority_p();
     rr();
     lottery();
+    cfs();  // CFS 알고리즘 추가
 
     return 0;
 }
