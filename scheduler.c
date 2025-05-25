@@ -11,8 +11,8 @@ typedef struct {
     int pid, arrival, burst, remaining, priority;
     int start_time, completion, waiting, turnaround;
     int finished;
-    double vruntime;  // 가상 실행 시간
-    int weight;       // 프로세스 가중치
+    long long vruntime; 
+    int weight;      
 } PCB;
 
 typedef struct {
@@ -30,8 +30,8 @@ void reset_metrics(PCB p[]) {
         p[i].start_time = -1;
         p[i].completion = p[i].waiting = p[i].turnaround = 0;
         p[i].finished = 0;
-        p[i].vruntime = 0.0;
-        p[i].weight = (10 - p[i].priority) * 100;  // 우선순위가 높을수록 가중치 증가
+        p[i].vruntime = 0;
+        p[i].weight = (10 - p[i].priority) * 100; 
     }
 }
 
@@ -51,8 +51,7 @@ void print_table(const char *title, PCB p[]) {
 
 void print_gantt(const char *algo_name, Event ev[], int cnt) {
     printf("\n>>> Gantt Chart – %s\n", algo_name);
-    
-    // 연속된 동일한 PID 이벤트 합치기
+
     Event merged[MAX_EVENTS];
     int merged_cnt = 0;
     
@@ -71,7 +70,6 @@ void print_gantt(const char *algo_name, Event ev[], int cnt) {
         merged_cnt++;
     }
 
-    // 합쳐진 이벤트 출력
     for(int i=0; i<merged_cnt; i++) {
         if (merged[i].pid == -1)
             printf("|  IDLE ");
@@ -334,10 +332,9 @@ void lottery() {
     int last = -1;
     int total_tickets = 0;
     int tickets[MAX_PROCESSES];
-    const int BASE_TICKETS = 100;  // 기본 티켓 수를 100으로 설정
-    const int LOTTERY_QUANTUM = 4; // Lottery의 시간 할당량
+    const int BASE_TICKETS = 100;  
+    const int LOTTERY_QUANTUM = 4; 
 
-    // 초기 티켓 할당 (우선순위가 높을수록 더 많은 티켓)
     for(int i=0; i<N; i++) {
         tickets[i] = (10 - P[i].priority) * BASE_TICKETS;
         total_tickets += tickets[i];
@@ -353,7 +350,6 @@ void lottery() {
     printf("Time\tAvailable Processes\tSelected Process\tWinning Ticket/Total\n");
 
     while(completed < N) {
-        // 현재 실행 가능한 프로세스들의 티켓 합계 계산
         int current_tickets = 0;
         int available[MAX_PROCESSES], avail_count = 0;
         
@@ -365,12 +361,10 @@ void lottery() {
         }
 
         if(avail_count > 0) {
-            // 랜덤하게 티켓 선택
             int winning_ticket = rand() % current_tickets;
             int idx = -1;
             int ticket_sum = 0;
 
-            // 현재 사용 가능한 프로세스들 출력
             printf("%d\t", time);
             for(int i=0; i<avail_count; i++) {
                 printf("P%d(%d) ", P[available[i]].pid, tickets[available[i]]);
@@ -386,13 +380,11 @@ void lottery() {
                 }
             }
 
-            // 선택된 프로세스와 당첨 티켓 번호, 총 티켓 수 출력
             printf("P%d\t\t%d/%d\n", P[idx].pid, winning_ticket, current_tickets);
 
             if(P[idx].start_time == -1) P[idx].start_time = time;
             int start = time;
-            
-            // 선택된 프로세스가 시간 할당량만큼 또는 남은 시간만큼 실행
+
             int exec_time = (P[idx].remaining > LOTTERY_QUANTUM) ? LOTTERY_QUANTUM : P[idx].remaining;
             P[idx].remaining -= exec_time;
             time += exec_time;
@@ -430,8 +422,9 @@ void cfs() {
     Event ev[MAX_EVENTS]; int ec=0;
     int time=0, completed=0;
     int last = -1;
-    const double MIN_GRANULARITY = 0.75;  // 최소 실행 시간 단위
-    const double TARGET_LATENCY = 6.0;    // 목표 지연 시간
+    const int MIN_GRANULARITY = 1;   
+    const int TARGET_LATENCY = 2*N;    
+    const int BASE_WEIGHT = 1024;
 
     printf("\n[CFS Weight Distribution]\n");
     printf("PID\tPriority\tWeight\n");
@@ -442,11 +435,10 @@ void cfs() {
 
     while(completed < N) {
         int idx = -1;
-        double min_vruntime = 1e9;
+        long long min_vruntime = 1e9;  
         int total_weight = 0;
         int available_count = 0;
 
-        // 현재 실행 가능한 프로세스들의 가중치 합계와 최소 vruntime 계산
         for(int i=0; i<N; i++) {
             if(!P[i].finished && P[i].arrival <= time) {
                 total_weight += P[i].weight;
@@ -461,19 +453,17 @@ void cfs() {
         if(available_count > 0) {
             if(P[idx].start_time == -1) P[idx].start_time = time;
 
-            // 실행 시간 계산 (가중치 기반)
-            double time_slice = TARGET_LATENCY * (P[idx].weight / (double)total_weight);
+            int time_slice = (TARGET_LATENCY * P[idx].weight) / total_weight;
             if(time_slice < MIN_GRANULARITY) time_slice = MIN_GRANULARITY;
             
-            int exec_time = (int)(time_slice > P[idx].remaining ? P[idx].remaining : time_slice);
+            int exec_time = (time_slice > P[idx].remaining ? P[idx].remaining : time_slice);
             
             int start = time;
             P[idx].remaining -= exec_time;
             time += exec_time;
             int end = time;
 
-            // vruntime 업데이트 (가중치 반영)
-            P[idx].vruntime += exec_time * (1024.0 / P[idx].weight);
+            P[idx].vruntime += (exec_time * BASE_WEIGHT) / P[idx].weight;
 
             if(idx != last)
                 ev[ec++] = (Event){P[idx].pid, start, end};
@@ -512,7 +502,7 @@ int main() {
     priority_p();
     rr();
     lottery();
-    cfs();  // CFS 알고리즘 추가
+    cfs();  
 
     return 0;
 }
