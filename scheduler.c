@@ -424,7 +424,7 @@ void cfs() {
     int last = -1;
     const int MIN_GRANULARITY = 1;   
     const int TARGET_LATENCY = 2*N;    
-    const int BASE_WEIGHT = 1024;
+    const int BASE_WEIGHT = 1000;
 
     printf("\n[CFS Weight Distribution]\n");
     printf("PID\tPriority\tWeight\n");
