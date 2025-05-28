@@ -167,6 +167,10 @@ void sjf_p() {
 
     while(completed < N) {
         int idx = -1, min_rem = 1e9;
+        if(last != -1) {
+            idx = last;
+            min_rem = P[idx].remaining;
+        }
         for(int i=0; i<N; i++)
             if(!P[i].finished && P[i].arrival <= time && P[i].remaining < min_rem) {
                 idx = i; min_rem = P[i].remaining;
@@ -244,6 +248,10 @@ void priority_p() {
 
     while(completed < N) {
         int idx = -1, min_pri = 1e9;
+        if(last != -1) {
+            idx = last;
+            min_pri = P[idx].priority;
+        }
         for(int i=0; i<N; i++)
             if(!P[i].finished && P[i].arrival <= time && P[i].priority < min_pri) {
                 idx = i; min_pri = P[i].priority;
