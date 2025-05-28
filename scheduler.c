@@ -340,14 +340,6 @@ void lottery() {
         total_tickets += tickets[i];
     }
 
-    printf("\n[Lottery Ticket Distribution]\n");
-    printf("PID\tPriority\tTickets\tTime Quantum\n");
-    for(int i=0; i<N; i++) {
-        printf("%d\t%d\t\t%d\t%d\n", P[i].pid, P[i].priority, tickets[i], LOTTERY_QUANTUM);
-    }
-    printf("Total Tickets: %d\n\n", total_tickets);
-    printf("[Lottery Drawing Results]\n");
-    printf("Time\tAvailable Processes\tSelected Process\tWinning Ticket/Total\n");
 
     while(completed < N) {
         int current_tickets = 0;
@@ -365,13 +357,6 @@ void lottery() {
             int idx = -1;
             int ticket_sum = 0;
 
-            printf("%d\t", time);
-            for(int i=0; i<avail_count; i++) {
-                printf("P%d(%d) ", P[available[i]].pid, tickets[available[i]]);
-                if(i < avail_count-1) printf(", ");
-            }
-            printf("\t\t");
-
             for(int i=0; i<avail_count; i++) {
                 ticket_sum += tickets[available[i]];
                 if(winning_ticket < ticket_sum) {
@@ -379,8 +364,6 @@ void lottery() {
                     break;
                 }
             }
-
-            printf("P%d\t\t%d/%d\n", P[idx].pid, winning_ticket, current_tickets);
 
             if(P[idx].start_time == -1) P[idx].start_time = time;
             int start = time;
@@ -405,14 +388,12 @@ void lottery() {
                 last = -1;
             }
         } else { 
-            printf("%d\tNone\t\t\tNone\t\t-\n", time);
             ev[ec++] = (Event){-1, time, time + 1};
             time++; 
             last = -1; 
             continue; 
         }
     }
-    printf("\n");
     print_table("[Lottery]", P);
     print_gantt("Lottery", ev, ec);
 }
@@ -425,13 +406,6 @@ void cfs() {
     const int MIN_GRANULARITY = 1;   
     const int TARGET_LATENCY = 2*N;    
     const int BASE_WEIGHT = 1000;
-
-    printf("\n[CFS Weight Distribution]\n");
-    printf("PID\tPriority\tWeight\n");
-    for(int i=0; i<N; i++) {
-        printf("%d\t%d\t\t%d\n", P[i].pid, P[i].priority, P[i].weight);
-    }
-    printf("\n");
 
     while(completed < N) {
         int idx = -1;
